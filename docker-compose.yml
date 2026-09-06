@@ -1,0 +1,44 @@
+# Phase 0/1 note: neither the FastAPI backend nor the React frontend need
+# Docker to run locally — see docs/setup.md for the plain venv/npm flow.
+#
+# This file exists now so the shape is right from day one, but the services
+# below (Neo4j, Redis, Ollama) aren't needed until Phase 2+ and are commented
+# out to avoid pulling multi-GB images before you actually need them.
+#
+# Uncomment services as you reach the phase that needs them:
+#   - redis:  Phase 4 (Celery job queue) and Phase 8 (search caching)
+#   - neo4j:  Phase 5 (knowledge graph)
+#   - ollama: Phase 3 (LLM summary generation)
+
+version: "3.9"
+
+services: {}
+# services:
+#   redis:
+#     image: redis:7-alpine
+#     ports:
+#       - "6379:6379"
+#     volumes:
+#       - redis_data:/data
+#
+#   neo4j:
+#     image: neo4j:5-community
+#     ports:
+#       - "7474:7474"
+#       - "7687:7687"
+#     environment:
+#       NEO4J_AUTH: neo4j/change-me
+#     volumes:
+#       - neo4j_data:/data
+#
+#   ollama:
+#     image: ollama/ollama:latest
+#     ports:
+#       - "11434:11434"
+#     volumes:
+#       - ollama_data:/root/.ollama
+#
+# volumes:
+#   redis_data:
+#   neo4j_data:
+#   ollama_data:

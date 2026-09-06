@@ -1,0 +1,27 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.egg-info/
+
+# Env files (real secrets never committed; .env.example is)
+.env
+backend/.env
+frontend/.env
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Data (populated from Phase 2 onward)
+backend/data/papers/*
+!backend/data/papers/.gitkeep
+backend/data/cache/*
+!backend/data/cache/.gitkeep
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
