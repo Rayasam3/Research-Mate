@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     pubmed_email: str = ""
     pubmed_api_key: str = ""
     search_max_results_per_source: int = 10
+    search_cache_ttl_seconds: int = 3600  # 1 hour
+    
+    # Phase 2: ingestion
+    papers_dir: str = "data/papers"
+    cache_dir: str = "data/cache"
+    chroma_persist_dir: str = "data/cache/chroma"
+    embedding_model: str = "all-MiniLM-L6-v2"
+    chunk_size_chars: int = 1500
+    chunk_overlap_chars: int = 200
+    pdf_download_timeout_seconds: int = 30
 
     @property
     def cors_origins_list(self) -> list[str]:

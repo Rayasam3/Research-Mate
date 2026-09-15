@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 async def search_arxiv(topic: str, max_results: int) -> list[Paper]:
     try:
-        client = arxiv.Client()
+        client = arxiv.Client(delay_seconds=3.0, num_retries=1)
         search = arxiv.Search(
             query=topic,
             max_results=max_results,

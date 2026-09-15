@@ -12,12 +12,16 @@ router = APIRouter()
 @limiter.limit(settings.rate_limit_search)
 async def search_papers(request: Request, payload: SearchRequest) -> SearchResponse:
     """
-    Search ArXiv, Semantic Scholar, and PubMed for a topic, merge and
-    dedupe the results. Rate-limited since this is a public endpoint.
+    Search ArXiv, Semantic Scholar, PubMed, and OpenAlex for a topic, merge
+    and dedupe the results. Cached by exact query for a while to avoid
+    re-hitting rate-limited external APIs. Rate-limited since this is a
+    public endpoint.
     """
     results = await search_all_sources(
         topic=payload.topic,
         max_results=payload.max_results,
         sources=payload.sources,
+        year_from=payload.year_from,
+        year_to=payload.year_to,
     )
     return SearchResponse(topic=payload.topic, total_results=len(results), results=results)

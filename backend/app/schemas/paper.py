@@ -1,7 +1,8 @@
 """
-The normalized shape every search source (ArXiv, Semantic Scholar, PubMed)
-gets mapped into. Later phases (ingestion, summary cards, knowledge graph)
-all build on top of this same object, so keep it source-agnostic.
+The normalized shape every search source (ArXiv, Semantic Scholar, PubMed,
+OpenAlex) gets mapped into. Later phases (ingestion, summary cards,
+knowledge graph) all build on top of this same object, so keep it
+source-agnostic.
 """
 from datetime import date
 from enum import Enum
@@ -13,6 +14,7 @@ class PaperSource(str, Enum):
     ARXIV = "arxiv"
     SEMANTIC_SCHOLAR = "semantic_scholar"
     PUBMED = "pubmed"
+    OPENALEX = "openalex"
 
 
 class Paper(BaseModel):
@@ -37,7 +39,19 @@ class SearchRequest(BaseModel):
     )
     sources: list[PaperSource] | None = Field(
         default=None,
-        description="Restrict to specific sources. Defaults to all three.",
+        description="Restrict to specific sources. Defaults to all four.",
+    )
+    year_from: int | None = Field(
+        default=None,
+        ge=1900,
+        le=2100,
+        description="Only include papers published in or after this year.",
+    )
+    year_to: int | None = Field(
+        default=None,
+        ge=1900,
+        le=2100,
+        description="Only include papers published in or before this year.",
     )
 
 
