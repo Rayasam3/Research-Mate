@@ -15,3 +15,5 @@ pip-system-certs; sys_platform == "win32"
 pymupdf==1.24.11
 chromadb==0.5.15
 sentence-transformers==3.1.1
+
+langgraph==0.2.39

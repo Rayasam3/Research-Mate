@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.api.agent import router as agent_router
 from app.api.ingest import router as ingest_router
 from app.api.search import router as search_router
 from app.api.summarize import router as summarize_router
@@ -29,7 +30,7 @@ app.add_middleware(
 
 app.include_router(search_router, prefix="/api", tags=["search"])
 app.include_router(ingest_router, prefix="/api", tags=["ingest"])
-app.include_router(summarize_router, prefix="/api", tags=["summarize"])
+app.include_router(agent_router, prefix="/api", tags=["agent"])
 
 
 @app.get("/health")
