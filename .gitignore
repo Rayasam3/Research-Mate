@@ -20,6 +20,7 @@ backend/data/papers/*
 !backend/data/papers/.gitkeep
 backend/data/cache/*
 !backend/data/cache/.gitkeep
+data/
 
 # OS / editor
 .DS_Store
