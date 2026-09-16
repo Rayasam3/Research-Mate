@@ -24,6 +24,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.api.agent import router as agent_router
+from app.api.gaps import router as gaps_router
 from app.api.graph import router as graph_router
 from app.api.ingest import router as ingest_router
 from app.api.search import router as search_router
@@ -65,6 +66,7 @@ app.include_router(ingest_router, prefix="/api", tags=["ingest"])
 app.include_router(summarize_router, prefix="/api", tags=["summarize"])
 app.include_router(agent_router, prefix="/api", tags=["agent"])
 app.include_router(graph_router, prefix="/api", tags=["graph"])
+app.include_router(gaps_router, prefix="/api", tags=["gaps"])
 
 
 @app.get("/health")
