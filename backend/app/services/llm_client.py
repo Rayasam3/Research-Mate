@@ -16,7 +16,7 @@ deployment.
 """
 import json
 import logging
-
+import asyncio
 import httpx
 
 from app.core.config import settings
@@ -54,7 +54,7 @@ async def _generate_json_ollama(prompt: str) -> str:
     return data.get("response", "")
 
 
-async def _generate_json_groq(prompt: str) -> str:
+async def _generate_json_groq(prompt: str, retry_on_rate_limit: bool = True) -> str:
     if not settings.groq_api_key:
         raise LlmError(
             "llm_provider is set to 'groq' but GROQ_API_KEY is not set in .env. "
@@ -76,6 +76,10 @@ async def _generate_json_groq(prompt: str) -> str:
             resp.raise_for_status()
             data = resp.json()
     except httpx.HTTPStatusError as exc:
+        if exc.response.status_code == 429 and retry_on_rate_limit:
+            logger.warning("Groq rate-limited, waiting 12s before one retry")
+            await asyncio.sleep(12)
+            return await _generate_json_groq(prompt, retry_on_rate_limit=False)
         logger.error("Groq request failed with status %s: %s", exc.response.status_code, exc.response.text)
         raise LlmError(f"Groq request failed ({exc.response.status_code}): {exc.response.text[:300]}") from exc
     except Exception as exc:
