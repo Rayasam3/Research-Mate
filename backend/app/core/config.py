@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     pubmed_api_key: str = ""
     search_max_results_per_source: int = 10
     search_cache_ttl_seconds: int = 3600  # 1 hour
-    
+
     # Phase 2: ingestion
     papers_dir: str = "data/papers"
     cache_dir: str = "data/cache"
@@ -36,7 +36,7 @@ class Settings(BaseSettings):
     chunk_size_chars: int = 1500
     chunk_overlap_chars: int = 200
     pdf_download_timeout_seconds: int = 30
-    
+
     # Phase 3: LLM summary generation
     # llm_provider selects which backend generate_json() calls: "ollama"
     # (free, local, private, slow on CPU-only machines) or "groq" (hosted,
@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     groq_model: str = "openai/gpt-oss-20b"
     groq_timeout_seconds: int = 60
     summary_chunks_used: int = 3  # how many stored chunks to feed the LLM per paper
+
+    # Phase 5: knowledge graph
+    neo4j_uri: str = "bolt://localhost:7687"
+    neo4j_user: str = "neo4j"
+    neo4j_password: str = "change-me"
+    entity_extraction_chunks_used: int = 1
 
     @property
     def cors_origins_list(self) -> list[str]:

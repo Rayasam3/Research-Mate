@@ -65,10 +65,11 @@ async def summarize_node(state: AgentState) -> dict:
     results: dict[str, dict] = {}
     errors = list(state.get("errors", []))
     ingest_results = state.get("ingest_results", {})
+    print(f"DEBUG summarize_node received ingest_results: {ingest_results!r}", flush=True)
 
     for paper_id, ingest_result in ingest_results.items():
-        if ingest_result.get("status") != "success":
-            continue  # nothing to summarize if ingestion didn't succeed
+        if ingest_result.get("status") not in ("success", "already_cached"):
+            continue  # nothing to summarize if ingestion truly failed
         try:
             summary = await summarize_paper(paper_id)
             results[paper_id] = summary

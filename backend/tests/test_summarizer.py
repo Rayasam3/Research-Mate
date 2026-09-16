@@ -8,6 +8,9 @@ from app.services import summarizer
 from app.services.llm_client import LlmError
 
 
+async def _async_return(value):
+    return value
+
 def _paper(**overrides) -> Paper:
     defaults = dict(
         external_id="1706.03762",

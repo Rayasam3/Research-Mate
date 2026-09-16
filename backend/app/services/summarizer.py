@@ -11,6 +11,8 @@ from pathlib import Path
 from app.core.config import settings
 from app.schemas.summary import PaperSummaryCard, SummaryStatus
 from app.services.citation import generate_apa_citation, generate_bibtex_citation
+from app.services.entity_extraction import extract_entities
+from app.services.graph_ingestion import index_paper_in_graph
 from app.services.llm_client import LlmError, generate_json
 from ingestion.pipeline import load_paper_metadata
 from ingestion.vector_store import get_chunks_for_paper
@@ -76,6 +78,18 @@ async def summarize_paper(paper_id: str, force: bool = False) -> dict:
         cached = _read_cached_summary(paper_id)
         if cached is not None:
             logger.info("Summary for %s already cached, skipping LLM call", paper_id)
+            # Still attempt graph indexing (best-effort) - a summary cached
+            # from before Phase 5 existed would otherwise never get its
+            # entities extracted and written to the graph.
+            try:
+                paper = load_paper_metadata(paper_id)
+                if paper is not None:
+                    entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
+                    entities = await extract_entities(paper.title, entity_chunks)
+                    await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"])
+            except Exception:
+                logger.exception("Graph indexing failed for cached summary paper_id=%s", paper_id)
+
             return {
                 "paper_id": paper_id,
                 "status": SummaryStatus.ALREADY_CACHED,
@@ -134,6 +148,16 @@ async def summarize_paper(paper_id: str, force: bool = False) -> dict:
     )
 
     _write_cached_summary(paper_id, card)
+
+    # Best-effort graph indexing: a failure here should never break the
+    # summary response itself, since the summary is the primary deliverable
+    # and the graph is an enrichment on top of it (Phase 5).
+    try:
+        entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
+        entities = await extract_entities(paper.title, entity_chunks)
+        await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"])
+    except Exception:
+        logger.exception("Graph indexing failed for paper_id=%s (summary still succeeded)", paper_id)
 
     return {
         "paper_id": paper_id,
