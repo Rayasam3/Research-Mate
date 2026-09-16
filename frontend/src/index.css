@@ -4,8 +4,6 @@
 
 body {
   font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
-  background-color: #f8fafc;
-  color: #0f172a;
 }
 
 ::-webkit-scrollbar {
@@ -15,4 +13,7 @@ body {
 ::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
   border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #475569;
 }

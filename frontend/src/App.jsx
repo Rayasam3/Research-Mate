@@ -6,7 +6,7 @@ import SearchPage from "./pages/SearchPage";
 
 export default function App() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 transition-colors dark:bg-slate-950">
       <Header />
       <Routes>
         <Route path="/" element={<SearchPage />} />
