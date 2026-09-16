@@ -35,7 +35,7 @@ def get_cached_search(topic: str, sources: list[str], max_results: int, year_fro
         return None
 
     try:
-        payload = json.loads(path.read_text())
+        payload = json.loads(path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         logger.warning("Corrupt search cache file %s, ignoring", path)
         return None
@@ -54,6 +54,6 @@ def set_cached_search(
     key = _cache_key(topic, sources, max_results, year_from, year_to)
     path = _cache_dir() / f"{key}.json"
     try:
-        path.write_text(json.dumps({"cached_at": time.time(), "results": results}))
+        path.write_text(json.dumps({"cached_at": time.time(), "results": results}), encoding="utf-8")
     except OSError:
         logger.warning("Failed to write search cache file %s", path)

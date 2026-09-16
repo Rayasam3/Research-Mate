@@ -10,6 +10,7 @@ from slowapi.errors import RateLimitExceeded
 
 from app.api.ingest import router as ingest_router
 from app.api.search import router as search_router
+from app.api.summarize import router as summarize_router
 from app.core.config import settings
 from app.core.limiter import limiter
 
@@ -27,8 +28,8 @@ app.add_middleware(
 )
 
 app.include_router(search_router, prefix="/api", tags=["search"])
-
 app.include_router(ingest_router, prefix="/api", tags=["ingest"])
+app.include_router(summarize_router, prefix="/api", tags=["summarize"])
 
 
 @app.get("/health")

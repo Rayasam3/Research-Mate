@@ -36,6 +36,21 @@ class Settings(BaseSettings):
     chunk_size_chars: int = 1500
     chunk_overlap_chars: int = 200
     pdf_download_timeout_seconds: int = 30
+    
+    # Phase 3: LLM summary generation
+    # llm_provider selects which backend generate_json() calls: "ollama"
+    # (free, local, private, slow on CPU-only machines) or "groq" (hosted,
+    # much faster, needs a free API key). Both share the same summarizer
+    # code - switching is a one-line .env change, no code change, which is
+    # exactly what Phase 7's public-deployment model choice needs too.
+    llm_provider: str = "ollama"
+    ollama_host: str = "http://localhost:11434"
+    ollama_model: str = "llama3.1:8b"
+    ollama_timeout_seconds: int = 600
+    groq_api_key: str = ""
+    groq_model: str = "openai/gpt-oss-20b"
+    groq_timeout_seconds: int = 60
+    summary_chunks_used: int = 3  # how many stored chunks to feed the LLM per paper
 
     @property
     def cors_origins_list(self) -> list[str]:

@@ -38,7 +38,7 @@ def _read_cache_marker(paper_id: str) -> dict | None:
     if not marker.exists():
         return None
     try:
-        return json.loads(marker.read_text())
+        return json.loads(marker.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         logger.warning("Corrupt cache marker for %s, ignoring", paper_id)
         return None
@@ -47,8 +47,34 @@ def _read_cache_marker(paper_id: str) -> dict | None:
 def _write_cache_marker(paper_id: str, data: dict) -> None:
     marker = _cache_marker_path(paper_id)
     marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(json.dumps(data))
+    marker.write_text(json.dumps(data), encoding="utf-8")
 
+
+def _paper_metadata_path(paper_id: str) -> Path:
+    return Path(settings.cache_dir) / "paper_metadata" / f"{paper_id}.json"
+
+
+def save_paper_metadata(paper_id: str, paper: Paper) -> None:
+    """
+    Persists full paper metadata (authors, DOI, year, etc.) keyed by
+    paper_id, independent of ingestion success/failure. Phase 3's citation
+    generator reads this back, so a summary can be requested with just a
+    paper_id rather than resending the whole paper object every time.
+    """
+    path = _paper_metadata_path(paper_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(paper.model_dump_json(), encoding="utf-8")
+
+
+def load_paper_metadata(paper_id: str) -> Paper | None:
+    path = _paper_metadata_path(paper_id)
+    if not path.exists():
+        return None
+    try:
+        return Paper.model_validate_json(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError, ValueError):
+        logger.warning("Corrupt paper metadata for %s, ignoring", paper_id)
+        return None
 
 async def ingest_paper(paper: Paper, force: bool = False) -> dict:
     """
@@ -58,6 +84,7 @@ async def ingest_paper(paper: Paper, force: bool = False) -> dict:
     returned as a status the caller can act on or display.
     """
     paper_id = make_paper_id(paper)
+    save_paper_metadata(paper_id, paper)
 
     if not force:
         cached = _read_cache_marker(paper_id)

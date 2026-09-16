@@ -57,3 +57,28 @@ def get_chunk_count(paper_id: str) -> int:
     collection = _get_collection()
     result = collection.get(where={"paper_id": paper_id})
     return len(result["ids"])
+
+
+def get_chunks_for_paper(paper_id: str, limit: int | None = None) -> list[str]:
+    """
+    Returns a paper's stored chunks, ordered by their original position in
+    the document (chunk_index), so the LLM sees the paper roughly in the
+    order it was written rather than in random storage order. If `limit`
+    is given, returns the first N chunks - early chunks (abstract, intro)
+    are usually the most information-dense for a summary, so a simple
+    "take the first N" is a reasonable default over a fancier relevance
+    search for this phase.
+    """
+    collection = _get_collection()
+    result = collection.get(where={"paper_id": paper_id}, include=["documents", "metadatas"])
+
+    if not result["ids"]:
+        return []
+
+    paired = list(zip(result["metadatas"], result["documents"]))
+    paired.sort(key=lambda pair: pair[0]["chunk_index"])
+    ordered_chunks = [doc for _, doc in paired]
+
+    if limit is not None:
+        return ordered_chunks[:limit]
+    return ordered_chunks
