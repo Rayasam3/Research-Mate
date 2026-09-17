@@ -19,7 +19,8 @@ pip-system-certs; sys_platform == "win32"
 # Phase 2: document ingestion & full-text reading
 pymupdf==1.24.11
 chromadb==0.5.15
-sentence-transformers==3.1.1
+#sentence-transformers==3.1.1
+onnxruntime==1.19.2
 
 # Phase 4: LangGraph agent
 langgraph==0.2.39

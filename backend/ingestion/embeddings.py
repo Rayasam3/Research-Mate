@@ -1,30 +1,29 @@
 """
-Wraps a local sentence-transformers embedding model. Loaded lazily and
-cached as a module-level singleton so the ~80MB model is only loaded once
-per process, not once per request.
+Provides the embedding function used by ChromaDB. Uses ChromaDB's
+built-in ONNX-based embedding function instead of sentence-transformers
+(PyTorch) - same underlying model family and embedding quality for our
+use case, but without pulling in PyTorch's much heavier memory footprint.
+This matters specifically for fitting comfortably within free-tier
+hosting memory limits (e.g. Render's 512MB free tier).
 """
 import logging
 
-from sentence_transformers import SentenceTransformer
-
-from app.core.config import settings
+from chromadb.utils import embedding_functions
 
 logger = logging.getLogger(__name__)
 
-_model: SentenceTransformer | None = None
+_embedding_function = None
 
 
-def get_embedding_model() -> SentenceTransformer:
-    global _model
-    if _model is None:
-        logger.info("Loading embedding model %s (first call only)...", settings.embedding_model)
-        _model = SentenceTransformer(settings.embedding_model)
-    return _model
-
-
-def embed_texts(texts: list[str]) -> list[list[float]]:
-    if not texts:
-        return []
-    model = get_embedding_model()
-    vectors = model.encode(texts, show_progress_bar=False, convert_to_numpy=True)
-    return vectors.tolist()
+def get_embedding_function():
+    """
+    Returns a lazily-created, cached ChromaDB embedding function backed by
+    ONNX Runtime. Passed directly to a ChromaDB collection so ChromaDB
+    handles embedding internally - we no longer call an embed step
+    ourselves before storing chunks.
+    """
+    global _embedding_function
+    if _embedding_function is None:
+        logger.info("Loading ONNX embedding function (first call only)...")
+        _embedding_function = embedding_functions.ONNXMiniLM_L6_V2()
+    return _embedding_function

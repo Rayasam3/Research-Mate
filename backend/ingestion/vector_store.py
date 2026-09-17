@@ -2,14 +2,15 @@
 Thin wrapper around a persistent ChromaDB collection. Each chunk is
 stored with its embedding plus metadata (paper_id, chunk_index, title) so
 later phases (summary generation, comparison) can filter/retrieve by
-paper without re-embedding anything.
+paper without re-embedding anything. ChromaDB computes embeddings itself
+via the ONNX embedding function (see embeddings.py) - we just pass text.
 """
 import logging
 
 import chromadb
 
 from app.core.config import settings
-from ingestion.embeddings import embed_texts
+from ingestion.embeddings import get_embedding_function
 
 logger = logging.getLogger(__name__)
 
@@ -25,14 +26,17 @@ def _get_client() -> chromadb.ClientAPI:
 
 
 def _get_collection():
-    return _get_client().get_or_create_collection(_COLLECTION_NAME)
+    return _get_client().get_or_create_collection(
+        _COLLECTION_NAME, embedding_function=get_embedding_function()
+    )
 
 
 def upsert_chunks(paper_id: str, title: str, chunks: list[str]) -> int:
     """
-    Embeds and stores chunks for a paper. Existing chunks for this
-    paper_id are deleted first, so re-ingesting a paper never duplicates
-    entries. Returns the number of chunks stored.
+    Stores chunks for a paper; ChromaDB embeds them internally using the
+    configured ONNX embedding function. Existing chunks for this paper_id
+    are deleted first, so re-ingesting a paper never duplicates entries.
+    Returns the number of chunks stored.
     """
     if not chunks:
         return 0
@@ -42,13 +46,12 @@ def upsert_chunks(paper_id: str, title: str, chunks: list[str]) -> int:
     # Clear any previous chunks for this paper (safe no-op if none exist).
     collection.delete(where={"paper_id": paper_id})
 
-    embeddings = embed_texts(chunks)
     ids = [f"{paper_id}::chunk_{i}" for i in range(len(chunks))]
     metadatas = [
         {"paper_id": paper_id, "title": title, "chunk_index": i} for i in range(len(chunks))
     ]
 
-    collection.add(ids=ids, embeddings=embeddings, documents=chunks, metadatas=metadatas)
+    collection.add(ids=ids, documents=chunks, metadatas=metadatas)
     logger.info("Stored %d chunks for paper_id=%s in ChromaDB", len(chunks), paper_id)
     return len(chunks)
 
