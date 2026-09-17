@@ -38,10 +38,17 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    import asyncio
+
     from app.services.graph_client import ensure_constraints
 
     try:
-        await ensure_constraints()
+        await asyncio.wait_for(ensure_constraints(), timeout=10.0)
+    except asyncio.TimeoutError:
+        logger.warning(
+            "Neo4j connection timed out on startup - graph features will fail until it's reachable. "
+            "App will continue starting so it can still serve non-graph requests."
+        )
     except Exception:
         logger.warning(
             "Could not connect to Neo4j on startup - graph features will fail until it's reachable."
