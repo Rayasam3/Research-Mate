@@ -1,59 +1,56 @@
 """
-A simple file-based cache for search results, keyed by the exact query
-parameters. This exists mainly to avoid re-hitting ArXiv/Semantic
-Scholar's tight rate limits while developing/testing (repeating the same
-search costs nothing once cached), and it also speeds up popular topics
-once this is a live public service. Redis will replace this in Phase 8
-for multi-instance deployments; a local JSON file is enough for now.
+Caches search results, keyed by the exact query parameters. Backed by
+Redis (Phase 8) when available and enabled, since a shared cache is
+required once the app runs across multiple processes/instances; falls
+back to no caching (not a crash) if Redis is unreachable, since a slower
+search is far better than a broken one.
 """
 import hashlib
 import json
 import logging
-import time
-from pathlib import Path
 
 from app.core.config import settings
+from app.services.redis_client import get_redis_client, redis_is_available
 
 logger = logging.getLogger(__name__)
 
 
-def _cache_dir() -> Path:
-    path = Path(settings.cache_dir) / "search"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def _cache_key(topic: str, sources: list[str], max_results: int, year_from, year_to) -> str:
     raw = f"{topic.lower().strip()}|{sorted(sources)}|{max_results}|{year_from}|{year_to}"
-    return hashlib.sha256(raw.encode()).hexdigest()
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    return f"research_mate:search:{digest}"
 
 
-def get_cached_search(topic: str, sources: list[str], max_results: int, year_from, year_to) -> list[dict] | None:
+async def get_cached_search(topic: str, sources: list[str], max_results: int, year_from, year_to) -> list[dict] | None:
+    if not settings.use_redis_cache:
+        return None
+    if not await redis_is_available():
+        return None
+
     key = _cache_key(topic, sources, max_results, year_from, year_to)
-    path = _cache_dir() / f"{key}.json"
-    if not path.exists():
-        return None
-
     try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError):
-        logger.warning("Corrupt search cache file %s, ignoring", path)
+        client = get_redis_client()
+        raw = await client.get(key)
+        if raw is None:
+            return None
+        logger.info("Redis search cache hit for topic=%r", topic)
+        return json.loads(raw)
+    except Exception:
+        logger.exception("Redis read failed for search cache key=%s", key)
         return None
 
-    age_seconds = time.time() - payload.get("cached_at", 0)
-    if age_seconds > settings.search_cache_ttl_seconds:
-        return None  # expired
 
-    logger.info("Search cache hit for topic=%r (age=%.0fs)", topic, age_seconds)
-    return payload.get("results")
-
-
-def set_cached_search(
+async def set_cached_search(
     topic: str, sources: list[str], max_results: int, year_from, year_to, results: list[dict]
 ) -> None:
+    if not settings.use_redis_cache:
+        return
+    if not await redis_is_available():
+        return
+
     key = _cache_key(topic, sources, max_results, year_from, year_to)
-    path = _cache_dir() / f"{key}.json"
     try:
-        path.write_text(json.dumps({"cached_at": time.time(), "results": results}), encoding="utf-8")
-    except OSError:
-        logger.warning("Failed to write search cache file %s", path)
+        client = get_redis_client()
+        await client.set(key, json.dumps(results), ex=settings.search_cache_ttl_seconds)
+    except Exception:
+        logger.exception("Redis write failed for search cache key=%s", key)

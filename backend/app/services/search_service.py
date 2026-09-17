@@ -7,6 +7,10 @@ identical searches don't re-hit rate-limited external APIs.
 import asyncio
 import re
 from datetime import date
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 from app.core.config import settings
 from app.schemas.paper import Paper, PaperSource
@@ -78,7 +82,7 @@ async def search_all_sources(
     active_sources = sources or list(_SOURCE_FUNCS.keys())
     source_names = [s.value for s in active_sources]
 
-    cached = get_cached_search(topic, source_names, per_source_cap, year_from, year_to)
+    cached = await get_cached_search(topic, source_names, per_source_cap, year_from, year_to)
     if cached is not None:
         return [Paper(**p) for p in cached]
 
@@ -93,7 +97,11 @@ async def search_all_sources(
     # scoring / better ranking is a candidate improvement for later phases.
     filtered.sort(key=lambda p: p.published_date or date.min, reverse=True)
 
-    set_cached_search(
+    await set_cached_search(
         topic, source_names, per_source_cap, year_from, year_to, [p.model_dump(mode="json") for p in filtered]
+    )
+    logger.info(
+    "Search completed: topic=%r sources=%s results=%d",
+    topic, source_names, len(filtered),
     )
     return filtered

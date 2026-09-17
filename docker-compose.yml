@@ -12,6 +12,7 @@ version: "3.9"
 services:
   neo4j:
     image: neo4j:5-community
+    restart: unless-stopped
     ports:
       - "7474:7474"
       - "7687:7687"
@@ -20,12 +21,13 @@ services:
     volumes:
       - neo4j_data:/data
 #
-#   redis:
-#     image: redis:7-alpine
-#     ports:
-#       - "6379:6379"
-#     volumes:
-#       - redis_data:/data
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
 #
 #   ollama:
 #     image: ollama/ollama:latest
@@ -36,5 +38,5 @@ services:
 
 volumes:
   neo4j_data:
-#   redis_data:
+  redis_data:
 #   ollama_data:

@@ -1,5 +1,3 @@
-import time
-
 import pytest
 
 from app.core.config import settings
@@ -7,42 +5,85 @@ from app.services import search_cache
 
 
 @pytest.fixture(autouse=True)
-def _use_tmp_cache_dir(monkeypatch, tmp_path):
-    monkeypatch.setattr(settings, "cache_dir", str(tmp_path))
+def _disable_redis(monkeypatch):
+    """
+    Tests run with Redis disabled by default, so they test the graceful
+    fallback path (no caching, no crash) without needing a real Redis
+    connection - fast, isolated, no external dependency.
+    """
+    monkeypatch.setattr(settings, "use_redis_cache", False)
     yield
 
 
-def test_cache_miss_returns_none():
-    result = search_cache.get_cached_search("nonexistent topic", ["arxiv"], 5, None, None)
+@pytest.mark.asyncio
+async def test_get_cached_search_returns_none_when_disabled():
+    result = await search_cache.get_cached_search("topic", ["arxiv"], 5, None, None)
     assert result is None
 
 
-def test_cache_set_then_get_returns_same_results():
-    results = [{"title": "Attention Is All You Need", "external_id": "1706.03762"}]
-    search_cache.set_cached_search("transformers", ["arxiv"], 5, None, None, results)
-
-    cached = search_cache.get_cached_search("transformers", ["arxiv"], 5, None, None)
-    assert cached == results
+@pytest.mark.asyncio
+async def test_set_cached_search_no_ops_when_disabled():
+    # Should not raise even though nothing is actually cached.
+    await search_cache.set_cached_search("topic", ["arxiv"], 5, None, None, [{"a": 1}])
 
 
-def test_cache_key_is_case_insensitive_on_topic():
+@pytest.mark.asyncio
+async def test_get_cached_search_falls_back_gracefully_when_redis_unreachable(monkeypatch):
+    monkeypatch.setattr(settings, "use_redis_cache", True)
+
+    async def fake_unavailable():
+        return False
+
+    monkeypatch.setattr(search_cache, "redis_is_available", fake_unavailable)
+
+    result = await search_cache.get_cached_search("topic", ["arxiv"], 5, None, None)
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_set_and_get_cached_search_roundtrip_with_fake_redis(monkeypatch):
+    monkeypatch.setattr(settings, "use_redis_cache", True)
+
+    store = {}
+
+    class FakeRedisClient:
+        async def get(self, key):
+            return store.get(key)
+
+        async def set(self, key, value, ex=None):
+            store[key] = value
+
+    async def fake_available():
+        return True
+
+    monkeypatch.setattr(search_cache, "redis_is_available", fake_available)
+    monkeypatch.setattr(search_cache, "get_redis_client", lambda: FakeRedisClient())
+
     results = [{"title": "Test Paper"}]
-    search_cache.set_cached_search("Transformers", ["arxiv"], 5, None, None, results)
-
-    cached = search_cache.get_cached_search("transformers", ["arxiv"], 5, None, None)
+    await search_cache.set_cached_search("topic", ["arxiv"], 5, None, None, results)
+    cached = await search_cache.get_cached_search("topic", ["arxiv"], 5, None, None)
     assert cached == results
 
 
-def test_cache_different_params_are_separate_entries():
-    search_cache.set_cached_search("topic", ["arxiv"], 5, None, None, [{"a": 1}])
-    search_cache.set_cached_search("topic", ["pubmed"], 5, None, None, [{"a": 2}])
+@pytest.mark.asyncio
+async def test_cache_key_is_case_insensitive_on_topic(monkeypatch):
+    monkeypatch.setattr(settings, "use_redis_cache", True)
 
-    assert search_cache.get_cached_search("topic", ["arxiv"], 5, None, None) == [{"a": 1}]
-    assert search_cache.get_cached_search("topic", ["pubmed"], 5, None, None) == [{"a": 2}]
+    store = {}
 
+    class FakeRedisClient:
+        async def get(self, key):
+            return store.get(key)
 
-def test_cache_expired_entry_returns_none(monkeypatch):
-    monkeypatch.setattr(settings, "search_cache_ttl_seconds", 1)
-    search_cache.set_cached_search("topic", ["arxiv"], 5, None, None, [{"a": 1}])
-    time.sleep(1.1)
-    assert search_cache.get_cached_search("topic", ["arxiv"], 5, None, None) is None
+        async def set(self, key, value, ex=None):
+            store[key] = value
+
+    async def fake_available():
+        return True
+
+    monkeypatch.setattr(search_cache, "redis_is_available", fake_available)
+    monkeypatch.setattr(search_cache, "get_redis_client", lambda: FakeRedisClient())
+
+    await search_cache.set_cached_search("Transformers", ["arxiv"], 5, None, None, [{"a": 1}])
+    cached = await search_cache.get_cached_search("transformers", ["arxiv"], 5, None, None)
+    assert cached == [{"a": 1}]

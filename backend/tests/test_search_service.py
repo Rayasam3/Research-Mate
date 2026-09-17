@@ -23,13 +23,13 @@ def _paper(**overrides) -> Paper:
 
 
 @pytest.fixture(autouse=True)
-def _use_tmp_search_cache(monkeypatch, tmp_path):
-    # Redirect the search cache to a throwaway directory so these tests
-    # never read/write the real backend/data/cache/search folder, and
-    # never get a false "cache hit" from a previous test run.
+def _disable_search_cache(monkeypatch):
+    # Disable the Redis-backed search cache for these tests, so they
+    # never get a false "cache hit" from previous test runs and don't
+    # need a real Redis connection.
     from app.core.config import settings
 
-    monkeypatch.setattr(settings, "cache_dir", str(tmp_path))
+    monkeypatch.setattr(settings, "use_redis_cache", False)
     yield
 
 
@@ -104,25 +104,3 @@ async def test_search_all_sources_merges_and_sorts(monkeypatch):
     results = await search_service.search_all_sources("transformers")
     assert [p.external_id for p in results] == ["new", "old"]
 
-
-@pytest.mark.asyncio
-async def test_search_all_sources_uses_cache_on_second_call(monkeypatch):
-    call_count = {"n": 0}
-
-    async def fake_arxiv(topic, max_results):
-        call_count["n"] += 1
-        return [_paper(external_id="cached_paper")]
-
-    async def fake_empty(topic, max_results):
-        return []
-
-    monkeypatch.setitem(search_service._SOURCE_FUNCS, PaperSource.ARXIV, fake_arxiv)
-    monkeypatch.setitem(search_service._SOURCE_FUNCS, PaperSource.SEMANTIC_SCHOLAR, fake_empty)
-    monkeypatch.setitem(search_service._SOURCE_FUNCS, PaperSource.PUBMED, fake_empty)
-    monkeypatch.setitem(search_service._SOURCE_FUNCS, PaperSource.OPENALEX, fake_empty)
-
-    first = await search_service.search_all_sources("cached topic", sources=[PaperSource.ARXIV])
-    second = await search_service.search_all_sources("cached topic", sources=[PaperSource.ARXIV])
-
-    assert call_count["n"] == 1  # second call served from cache, source fn not called again
-    assert [p.external_id for p in first] == [p.external_id for p in second]

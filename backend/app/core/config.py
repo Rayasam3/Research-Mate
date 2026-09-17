@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     search_max_results_per_source: int = 10
     search_cache_ttl_seconds: int = 3600  # 1 hour
 
+    redis_url: str = "redis://localhost:6380/0"
+    use_redis_cache: bool = True
+
     # Phase 2: ingestion
     papers_dir: str = "data/papers"
     cache_dir: str = "data/cache"
