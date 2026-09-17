@@ -17,9 +17,11 @@ deployment.
 import json
 import logging
 import asyncio
+import time
 import httpx
 
 from app.core.config import settings
+from app.services.metrics import record_llm_latency
 
 logger = logging.getLogger(__name__)
 
@@ -99,10 +101,12 @@ async def generate_json(prompt: str) -> dict:
     JSON. Raises LlmError on any failure - callers should catch this and
     report a clean LLM_FAILED status rather than crashing the request.
     """
+    start = time.monotonic()
     if settings.llm_provider == "groq":
         raw_text = await _generate_json_groq(prompt)
     else:
         raw_text = await _generate_json_ollama(prompt)
+    record_llm_latency((time.monotonic() - start) * 1000)
 
     try:
         return json.loads(raw_text)

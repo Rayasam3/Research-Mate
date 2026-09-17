@@ -27,6 +27,7 @@ from app.api.agent import router as agent_router
 from app.api.gaps import router as gaps_router
 from app.api.graph import router as graph_router
 from app.api.ingest import router as ingest_router
+from app.api.metrics import router as metrics_router
 from app.api.search import router as search_router
 from app.api.summarize import router as summarize_router
 from app.core.config import settings
@@ -61,12 +62,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def track_metrics_middleware(request, call_next):
+    from app.services.metrics import record_failure, record_request
+
+    endpoint = request.url.path
+    record_request(endpoint)
+    response = await call_next(request)
+    if response.status_code >= 400:
+        record_failure(endpoint)
+    return response
+
 app.include_router(search_router, prefix="/api", tags=["search"])
 app.include_router(ingest_router, prefix="/api", tags=["ingest"])
 app.include_router(summarize_router, prefix="/api", tags=["summarize"])
 app.include_router(agent_router, prefix="/api", tags=["agent"])
 app.include_router(graph_router, prefix="/api", tags=["graph"])
 app.include_router(gaps_router, prefix="/api", tags=["gaps"])
+app.include_router(metrics_router, prefix="/api", tags=["metrics"])
 
 
 @app.get("/health")
