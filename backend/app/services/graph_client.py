@@ -18,7 +18,10 @@ def get_driver():
     global _driver
     if _driver is None:
         _driver = AsyncGraphDatabase.driver(
-            settings.neo4j_uri, auth=(settings.neo4j_user, settings.neo4j_password)
+            settings.neo4j_uri,
+            auth=(settings.neo4j_user, settings.neo4j_password),
+            max_connection_lifetime=300,  # recycle connections every 5 min
+            liveness_check_timeout=30,     # verify connection is alive before reuse
         )
     return _driver
 
@@ -31,7 +34,7 @@ async def run_query(query: str, params: dict | None = None) -> list[dict]:
     """
     driver = get_driver()
     try:
-        async with driver.session() as session:
+        async with driver.session(database=settings.neo4j_database) as session:
             result = await session.run(query, params or {})
             records = await result.data()
             return records

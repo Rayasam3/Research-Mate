@@ -23,6 +23,14 @@ import httpx
 from app.core.config import settings
 from app.services.metrics import record_llm_latency
 
+
+
+# A global lock ensures only one Groq request is in flight at a time,
+# across all users and all concurrent requests. This turns "everyone
+# hits the rate limit simultaneously" into "everyone waits their turn" -
+# a real queue, not just a per-request retry.
+_groq_request_lock = asyncio.Lock()
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,21 +80,25 @@ async def _generate_json_groq(prompt: str, retry_on_rate_limit: bool = True) -> 
         "temperature": 0.2,
     }
 
-    try:
-        async with httpx.AsyncClient(timeout=settings.groq_timeout_seconds) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPStatusError as exc:
-        if exc.response.status_code == 429 and retry_on_rate_limit:
-            logger.warning("Groq rate-limited, waiting 12s before one retry")
-            await asyncio.sleep(12)
-            return await _generate_json_groq(prompt, retry_on_rate_limit=False)
-        logger.error("Groq request failed with status %s: %s", exc.response.status_code, exc.response.text)
-        raise LlmError(f"Groq request failed ({exc.response.status_code}): {exc.response.text[:300]}") from exc
-    except Exception as exc:
-        logger.exception("Groq request failed")
-        raise LlmError(f"Groq request failed: {exc}") from exc
+    # Wait in line: only one Groq request goes out at a time across the
+    # whole app. Under concurrent multi-user traffic, this turns
+    # simultaneous rate-limit collisions into an orderly queue instead.
+    async with _groq_request_lock:
+        try:
+            async with httpx.AsyncClient(timeout=settings.groq_timeout_seconds) as client:
+                resp = await client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPStatusError as exc:
+            if exc.response.status_code == 429 and retry_on_rate_limit:
+                logger.warning("Groq rate-limited, waiting 12s before one retry")
+                await asyncio.sleep(12)
+                return await _generate_json_groq(prompt, retry_on_rate_limit=False)
+            logger.error("Groq request failed with status %s: %s", exc.response.status_code, exc.response.text)
+            raise LlmError(f"Groq request failed ({exc.response.status_code}): {exc.response.text[:300]}") from exc
+        except Exception as exc:
+            logger.exception("Groq request failed")
+            raise LlmError(f"Groq request failed: {exc}") from exc
 
     try:
         return data["choices"][0]["message"]["content"]

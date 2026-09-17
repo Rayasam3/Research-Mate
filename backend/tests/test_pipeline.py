@@ -33,7 +33,8 @@ def test_make_paper_id_is_stable_and_filesystem_safe():
 
 
 @pytest.mark.asyncio
-async def test_ingest_paper_no_pdf_url_returns_early():
+async def test_ingest_paper_no_pdf_url_returns_early(monkeypatch):
+    monkeypatch.setattr(pipeline, "_read_cache_marker", lambda paper_id: None)
     paper = _paper(pdf_url=None)
     result = await pipeline.ingest_paper(paper)
     assert result["status"] == IngestStatus.NO_PDF_AVAILABLE

@@ -5,7 +5,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 
-# Env files (real secrets never committed; .env.example is)
+# Env files
 .env
 backend/.env
 frontend/.env
@@ -15,7 +15,7 @@ node_modules/
 frontend/dist/
 frontend/.vite/
 
-# Data (populated from Phase 2 onward)
+# Data
 backend/data/papers/*
 !backend/data/papers/.gitkeep
 backend/data/cache/*

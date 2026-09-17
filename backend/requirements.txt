@@ -10,13 +10,22 @@ certifi==2024.8.30
 tenacity==9.0.0
 pytest==8.3.3
 pytest-asyncio==0.24.0
+
+# Windows-only fix for SSL certificate verification errors caused by
+# antivirus/network HTTPS interception (see note in app/main.py).
+# Safe/no-op on Linux deployment servers.
 pip-system-certs; sys_platform == "win32"
 
+# Phase 2: document ingestion & full-text reading
 pymupdf==1.24.11
 chromadb==0.5.15
 sentence-transformers==3.1.1
 
+# Phase 4: LangGraph agent
 langgraph==0.2.39
 
+# Phase 5: knowledge graph
 neo4j==5.24.0
+
+# Phase 8: Redis caching
 redis==5.1.1
