@@ -24,6 +24,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.api.agent import router as agent_router
+from app.api.auth import router as auth_router
 from app.api.gaps import router as gaps_router
 from app.api.graph import router as graph_router
 from app.api.ingest import router as ingest_router
@@ -40,7 +41,13 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     import asyncio
 
+    from app.db.database import init_db
     from app.services.graph_client import ensure_constraints
+
+    try:
+        await init_db()
+    except Exception:
+        logger.warning("Could not initialize Postgres on startup - auth features will fail until it's reachable.")
 
     try:
         await asyncio.wait_for(ensure_constraints(), timeout=10.0)
@@ -87,6 +94,7 @@ app.include_router(summarize_router, prefix="/api", tags=["summarize"])
 app.include_router(agent_router, prefix="/api", tags=["agent"])
 app.include_router(graph_router, prefix="/api", tags=["graph"])
 app.include_router(gaps_router, prefix="/api", tags=["gaps"])
+app.include_router(auth_router, prefix="/api", tags=["auth"])
 app.include_router(metrics_router, prefix="/api", tags=["metrics"])
 
 

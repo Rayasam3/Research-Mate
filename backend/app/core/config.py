@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6380/0"
     use_redis_cache: bool = True
 
+    # Phase 10: user authentication
+    database_url: str = "postgresql+asyncpg://rm_admin:RmSecurePass2026@localhost:5434/research_mate_users"
+    jwt_secret_key: str = "8f42a73054b1749f8f58848be5e6502c"
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 10080
+
     # Phase 2: ingestion
     papers_dir: str = "data/papers"
     cache_dir: str = "data/cache"
