@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useEffect, useState } from "react";
 
 import { apiClient } from "../api/client";
 
@@ -10,19 +10,34 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
+    let cancelled = false;
+
+    async function checkAuth() {
+      if (!token) {
+        if (!cancelled) setLoading(false);
+        return;
+      }
+
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+
+      try {
+        const res = await apiClient.get("/api/auth/me");
+        if (!cancelled) setUser(res.data);
+      } catch {
+        if (!cancelled) {
+          setToken(null);
+          localStorage.removeItem("token");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
-    apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    apiClient
-      .get("/api/auth/me")
-      .then((res) => setUser(res.data))
-      .catch(() => {
-        setToken(null);
-        localStorage.removeItem("token");
-      })
-      .finally(() => setLoading(false));
+
+    checkAuth();
+
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   function login(newToken) {
@@ -38,13 +53,9 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
-  return (
-    <AuthContext.Provider value={{ token, user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const value = { token, user, loading, login, logout };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export default AuthContext;
