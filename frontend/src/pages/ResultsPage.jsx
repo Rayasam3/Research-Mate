@@ -71,7 +71,10 @@ export default function ResultsPage() {
   }
 
   function findPaperFor(paperId) {
-    return result.selected_papers.find((p) => paperId.endsWith(p.external_id.replace("/", "_")));
+    return result.selected_papers.find((p) => {
+      const expectedId = `${p.source}_${p.external_id.replace("/", "_")}`;
+      return paperId === expectedId;
+    });
   }
 
   async function loadExploreData() {

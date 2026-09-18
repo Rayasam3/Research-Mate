@@ -26,3 +26,8 @@ data/
 .DS_Store
 .vscode/
 .idea/
+
+backend/test_groq.py
+backend/output.log
+backend/backend_log.txt
+*.log
