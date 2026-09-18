@@ -13,6 +13,7 @@ class AgentState(TypedDict, total=False):
     max_papers: int
     year_from: int | None
     year_to: int | None
+    user_id: str
 
     candidate_papers: list[Paper]
     selected_papers: list[Paper]

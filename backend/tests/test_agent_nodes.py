@@ -103,7 +103,7 @@ async def test_ingest_node_records_failure_without_crashing(monkeypatch):
 async def test_summarize_node_only_summarizes_successful_ingests(monkeypatch):
     call_log = []
 
-    async def fake_summarize(paper_id, force=False):
+    async def fake_summarize(paper_id, force=False, user_id=None):
         call_log.append(paper_id)
         return {"paper_id": paper_id, "status": "success", "card": {}}
 

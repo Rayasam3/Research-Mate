@@ -10,12 +10,11 @@ from app.services.graph_client import run_query
 logger = logging.getLogger(__name__)
 
 
-async def get_comparison_table(paper_ids: list[str]) -> list[dict]:
+async def get_comparison_table(paper_ids: list[str], user_id: str | None = None) -> list[dict]:
     """
-    Returns one row per paper_id found in the graph, each with title,
-    year, methods, and datasets. Papers not yet graph-indexed (e.g. never
-    summarized, or summarized before Phase 5 existed) are simply omitted
-    from the result rather than causing an error.
+    user_id, when given, restricts results to papers owned by that user.
+    Left optional so the function still works for un-authenticated
+    contexts if ever needed.
     """
     if not paper_ids:
         return []
@@ -23,6 +22,7 @@ async def get_comparison_table(paper_ids: list[str]) -> list[dict]:
     query = """
     MATCH (p:Paper)
     WHERE p.paper_id IN $paper_ids
+      AND ($user_id IS NULL OR p.user_id = $user_id)
     OPTIONAL MATCH (p)-[:USES_METHOD]->(m:Method)
     OPTIONAL MATCH (p)-[:EVALUATED_ON]->(d:Dataset)
     RETURN p.paper_id AS paper_id,
@@ -31,8 +31,8 @@ async def get_comparison_table(paper_ids: list[str]) -> list[dict]:
            collect(DISTINCT m.name) AS methods,
            collect(DISTINCT d.name) AS datasets
     """
-    rows = await run_query(query, {"paper_ids": paper_ids})
-
+    rows = await run_query(query, {"paper_ids": paper_ids, "user_id": user_id})
+    
     # Neo4j's collect() on no matches returns [None] rather than [] - clean that up.
     for row in rows:
         row["methods"] = [m for m in row["methods"] if m]

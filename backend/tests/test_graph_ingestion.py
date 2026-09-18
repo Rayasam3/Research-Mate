@@ -33,7 +33,7 @@ async def test_index_paper_in_graph_runs_expected_queries(monkeypatch):
     monkeypatch.setattr(graph_ingestion, "run_query", fake_run_query)
 
     result = await graph_ingestion.index_paper_in_graph(
-        "arxiv_1706.03762", _paper(), methods=["self-attention"], datasets=["WMT 2014"]
+        "arxiv_1706.03762", _paper(), methods=["self-attention"], datasets=["WMT 2014"], user_id="user_123"
     )
 
     assert result["paper_id"] == "arxiv_1706.03762"
@@ -55,7 +55,9 @@ async def test_index_paper_in_graph_handles_no_methods_or_datasets(monkeypatch):
     monkeypatch.setattr(graph_ingestion, "run_query", fake_run_query)
 
     paper = _paper(authors=[])
-    await graph_ingestion.index_paper_in_graph("arxiv_1706.03762", paper, methods=[], datasets=[])
+    await graph_ingestion.index_paper_in_graph(
+        "arxiv_1706.03762", paper, methods=[], datasets=[], user_id="user_123"
+    )
 
     # Just the 1 paper MERGE query, no author/method/dataset queries
     assert len(queries_run) == 1

@@ -68,7 +68,7 @@ def build_prompt(title: str, chunks: list[str]) -> str:
     return _PROMPT_TEMPLATE.format(title=title, chunks=joined_chunks)
 
 
-async def summarize_paper(paper_id: str, force: bool = False) -> dict:
+async def summarize_paper(paper_id: str, force: bool = False, user_id: str | None = None) -> dict:
     """
     Returns a dict matching SummarizeResponse's fields. Never raises -
     every failure mode is caught and returned as a status the caller can
@@ -86,7 +86,7 @@ async def summarize_paper(paper_id: str, force: bool = False) -> dict:
                 if paper is not None:
                     entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
                     entities = await extract_entities(paper.title, entity_chunks)
-                    await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"])
+                    await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"], user_id)
             except Exception:
                 logger.exception("Graph indexing failed for cached summary paper_id=%s", paper_id)
 
@@ -155,7 +155,7 @@ async def summarize_paper(paper_id: str, force: bool = False) -> dict:
     try:
         entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
         entities = await extract_entities(paper.title, entity_chunks)
-        await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"])
+        await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"], user_id)
     except Exception:
         logger.exception("Graph indexing failed for paper_id=%s (summary still succeeded)", paper_id)
 
