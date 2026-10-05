@@ -1,33 +1,26 @@
 from datetime import date
+from types import SimpleNamespace
 
 import pytest
 
-from app.schemas.paper import Paper, PaperSource
 from app.services import graph_ingestion
 
 
-def _paper(**overrides) -> Paper:
-    defaults = dict(
-        external_id="1706.03762",
-        source=PaperSource.ARXIV,
+def _paper(authors=None):
+    return SimpleNamespace(
         title="Attention Is All You Need",
-        authors=["Ashish Vaswani", "Noam Shazeer"],
-        abstract="A transformer paper.",
+        authors=["Ashish Vaswani", "Noam Shazeer"] if authors is None else authors,
         published_date=date(2017, 6, 12),
-        pdf_url="https://arxiv.org/pdf/1706.03762",
-        doi=None,
-        url="https://arxiv.org/abs/1706.03762",
+        source=SimpleNamespace(value="arxiv"),
     )
-    defaults.update(overrides)
-    return Paper(**defaults)
 
 
 @pytest.mark.asyncio
 async def test_index_paper_in_graph_runs_expected_queries(monkeypatch):
-    queries_run = []
+    calls = []
 
     async def fake_run_query(query, params=None):
-        queries_run.append((query, params))
+        calls.append((query, params or {}))
         return []
 
     monkeypatch.setattr(graph_ingestion, "run_query", fake_run_query)
@@ -36,28 +29,30 @@ async def test_index_paper_in_graph_runs_expected_queries(monkeypatch):
         "arxiv_1706.03762", _paper(), methods=["self-attention"], datasets=["WMT 2014"], user_id="user_123"
     )
 
-    assert result["paper_id"] == "arxiv_1706.03762"
-    assert result["methods"] == ["self-attention"]
-    assert result["datasets"] == ["WMT 2014"]
-
-    # 1 paper MERGE + 2 author MERGEs + 1 method MERGE + 1 dataset MERGE = 5 queries
-    assert len(queries_run) == 5
+    # Paper node, authors, methods, datasets: one batched query each.
+    assert len(calls) == 4
+    assert calls[0][1]["paper_id"] == "arxiv_1706.03762"
+    assert calls[0][1]["user_id"] == "user_123"
+    assert calls[1][1]["authors"] == ["Ashish Vaswani", "Noam Shazeer"]
+    assert calls[2][1]["methods"][0]["key"] == "self-attention"
+    assert calls[3][1]["datasets"][0]["key"] == "wmt 2014"
+    assert result["authors"] == 2 and result["methods"] == 1 and result["datasets"] == 1
 
 
 @pytest.mark.asyncio
 async def test_index_paper_in_graph_handles_no_methods_or_datasets(monkeypatch):
-    queries_run = []
+    calls = []
 
     async def fake_run_query(query, params=None):
-        queries_run.append((query, params))
+        calls.append((query, params or {}))
         return []
 
     monkeypatch.setattr(graph_ingestion, "run_query", fake_run_query)
 
-    paper = _paper(authors=[])
-    await graph_ingestion.index_paper_in_graph(
-        "arxiv_1706.03762", paper, methods=[], datasets=[], user_id="user_123"
+    result = await graph_ingestion.index_paper_in_graph(
+        "arxiv_1706.03762", _paper(authors=[]), methods=[], datasets=[], user_id="user_123"
     )
 
-    # Just the 1 paper MERGE query, no author/method/dataset queries
-    assert len(queries_run) == 1
+    # Only the Paper node is written; nothing else to batch.
+    assert len(calls) == 1
+    assert result["authors"] == 0 and result["methods"] == 0 and result["datasets"] == 0

@@ -42,25 +42,28 @@ async def lifespan(app: FastAPI):
     import asyncio
 
     from app.db.database import init_db
-    from app.services.graph_client import ensure_constraints
+    from app.services.graph_schema import ensure_schema
 
     try:
         await init_db()
     except Exception:
-        logger.warning("Could not initialize Postgres on startup - auth features will fail until it's reachable.")
+        logger.warning(
+            "Could not initialize Postgres on startup - auth features will fail until it's reachable."
+        )
 
-    try:
-        await asyncio.wait_for(ensure_constraints(), timeout=10.0)
-    except asyncio.TimeoutError:
-        logger.warning(
-            "Neo4j connection timed out on startup - graph features will fail until it's reachable. "
-            "App will continue starting so it can still serve non-graph requests."
-        )
-    except Exception:
-        logger.warning(
-            "Could not connect to Neo4j on startup - graph features will fail until it's reachable."
-        )
+    async def _setup_graph_schema():
+        # Runs in the background so a slow Neo4j connection never delays startup.
+        try:
+            await asyncio.wait_for(ensure_schema(), timeout=120.0)
+            logger.info("Neo4j schema is ready.")
+        except Exception:
+            logger.warning(
+                "Neo4j schema setup did not finish - graph features may fail until it's reachable."
+            )
+
+    schema_task = asyncio.create_task(_setup_graph_schema())
     yield
+    schema_task.cancel()
 
 
 app = FastAPI(title="Research Mate API", version="0.1.0", lifespan=lifespan)
