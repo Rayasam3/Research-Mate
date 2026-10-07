@@ -18,6 +18,8 @@ pip-system-certs; sys_platform == "win32"
 
 # Phase 2: document ingestion & full-text reading
 pymupdf==1.24.11
+pdfplumber==0.11.4     # fallback PDF reader
+pypdf==5.0.1           # second fallback PDF reader
 chromadb==0.5.15
 #sentence-transformers==3.1.1
 onnxruntime==1.19.2

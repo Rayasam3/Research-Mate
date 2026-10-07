@@ -29,8 +29,15 @@ def create_job() -> str:
         "created_at": datetime.now(timezone.utc).isoformat(),
         "result": None,
         "error": None,
+        "steps_done": [],   # names of agent steps that have finished, in order
     }
     return job_id
+
+
+def add_step_done(job_id: str, step: str) -> None:
+    """Remember that one agent step (search, domain, ...) has finished."""
+    if job_id in _jobs:
+        _jobs[job_id]["steps_done"].append(step)
 
 
 def set_running(job_id: str) -> None:

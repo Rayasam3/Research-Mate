@@ -62,7 +62,8 @@ async def index_record_in_graph(
     await run_query(
         """
         MERGE (p:Paper {paper_id: $paper_id})
-        SET p.title = $title, p.year = $year, p.source = $source, p.user_id = $user_id
+        SET p.title = $title, p.year = $year, p.source = $source, p.user_id = $user_id,
+            p.citations = $citations
         """,
         {
             "paper_id": paper_id,
@@ -70,6 +71,7 @@ async def index_record_in_graph(
             "year": paper.published_date.year if paper.published_date else None,
             "source": paper.source.value,
             "user_id": user_id,
+            "citations": getattr(paper, "citation_count", None),
         },
     )
 

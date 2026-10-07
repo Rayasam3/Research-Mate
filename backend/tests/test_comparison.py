@@ -5,56 +5,56 @@ from app.services import comparison
 
 @pytest.mark.asyncio
 async def test_get_comparison_table_empty_list_returns_empty():
-    result = await comparison.get_comparison_table([])
-    assert result == []
+    assert await comparison.get_comparison_table([], "user1") == []
 
 
 @pytest.mark.asyncio
-async def test_get_comparison_table_cleans_null_collections(monkeypatch):
+async def test_comparison_marks_shared_and_unique_methods(monkeypatch):
     async def fake_run_query(query, params=None):
+        assert params["user_id"] == "user1"
         return [
-            {
-                "paper_id": "arxiv_123",
-                "title": "Some Paper",
-                "year": 2022,
-                "methods": [None],
-                "datasets": ["ImageNet", None],
-            }
+            {"paper_id": "p1", "title": "A", "year": 2023, "citations": 5, "domain": "Computer Science",
+             "task": "node classification", "datasets": ["Cora", None], "n_limitations": 2, "n_future_work": 1,
+             "methods": [{"key": "gcn", "name": "GCN", "role": "baseline", "novelty": None},
+                         {"key": "newnet", "name": "NewNet", "role": "proposed", "novelty": "adds X"},
+                         {"key": None, "name": None, "role": None, "novelty": None}]},
+            {"paper_id": "p2", "title": "B", "year": 2024, "citations": None, "domain": None,
+             "task": None, "datasets": [], "n_limitations": 0, "n_future_work": 0,
+             "methods": [{"key": "gcn", "name": "GCN", "role": "baseline", "novelty": None}]},
         ]
 
     monkeypatch.setattr(comparison, "run_query", fake_run_query)
+    rows = await comparison.get_comparison_table(["p1", "p2"], "user1")
 
-    result = await comparison.get_comparison_table(["arxiv_123"])
-    assert result[0]["methods"] == []
-    assert result[0]["datasets"] == ["ImageNet"]
-
-
-@pytest.mark.asyncio
-async def test_find_related_papers_uses_correct_relationship(monkeypatch):
-    captured_query = {}
-
-    async def fake_run_query(query, params=None):
-        captured_query["query"] = query
-        captured_query["params"] = params
-        return [{"paper_id": "p1", "title": "Related Paper", "year": 2021}]
-
-    monkeypatch.setattr(comparison, "run_query", fake_run_query)
-
-    result = await comparison.find_related_papers("dataset", "ImageNet", exclude_paper_id="p0")
-    assert "EVALUATED_ON" in captured_query["query"]
-    assert captured_query["params"]["entity_name"] == "ImageNet"
-    assert result[0]["paper_id"] == "p1"
+    assert rows[0]["datasets"] == ["Cora"]                       # None cleaned out
+    assert rows[0]["unique_methods"] == ["NewNet"]               # what makes paper 1 different
+    assert [m["shared"] for m in rows[0]["methods"]] == [True, False]
+    assert rows[1]["unique_methods"] == []
 
 
 @pytest.mark.asyncio
-async def test_find_related_papers_method_type_uses_method_relationship(monkeypatch):
-    captured_query = {}
+async def test_find_related_papers_uses_normalized_key(monkeypatch):
+    seen = {}
 
     async def fake_run_query(query, params=None):
-        captured_query["query"] = query
+        seen["query"], seen["params"] = query, params
         return []
 
     monkeypatch.setattr(comparison, "run_query", fake_run_query)
+    await comparison.find_related_papers("method", "GNNs", "user1", "p9")
+    assert "USES_METHOD" in seen["query"]
+    assert seen["params"]["key"] == "graph neural network"       # alias-normalized
+    assert seen["params"]["user_id"] == "user1"
 
-    await comparison.find_related_papers("method", "self-attention")
-    assert "USES_METHOD" in captured_query["query"]
+
+@pytest.mark.asyncio
+async def test_find_related_papers_dataset_uses_evaluated_on(monkeypatch):
+    seen = {}
+
+    async def fake_run_query(query, params=None):
+        seen["query"] = query
+        return []
+
+    monkeypatch.setattr(comparison, "run_query", fake_run_query)
+    await comparison.find_related_papers("dataset", "ImageNet", "user1")
+    assert "EVALUATED_ON" in seen["query"]

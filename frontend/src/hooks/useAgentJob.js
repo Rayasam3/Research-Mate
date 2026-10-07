@@ -29,7 +29,7 @@ export function useAgentJob(jobId) {
         // next interval tick will likely succeed. Only surface an error
         // if we've lost the connection for a sustained period.
         failureCountRef.current += 1;
-        if (!cancelled && failureCountRef.current >= 5) {
+        if (!cancelled && failureCountRef.current >= 20) {
           setError("Lost connection to the server. Please refresh the page.");
         }
       }

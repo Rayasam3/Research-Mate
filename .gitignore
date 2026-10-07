@@ -31,3 +31,5 @@ backend/test_groq.py
 backend/output.log
 backend/backend_log.txt
 *.log
+# Personal setup notes - not for GitHub
+SETUP_GUIDE.md

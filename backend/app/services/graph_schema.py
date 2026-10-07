@@ -58,6 +58,7 @@ _CONSTRAINTS = [
     ("limitation_key", "Limitation", "key"),
     ("futurework_key", "FutureWork", "key"),
     ("author_name", "Author", "name"),
+    ("gap_key", "Gap", "key"),
 ]
 
 

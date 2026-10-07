@@ -27,6 +27,8 @@ class Paper(BaseModel):
     pdf_url: str | None = None
     doi: str | None = None
     url: str | None = None
+    field: str | None = Field(default=None, description="Research field, e.g. 'Computer Science'")
+    citation_count: int | None = None
 
 
 class SearchRequest(BaseModel):

@@ -11,35 +11,44 @@ from pathlib import Path
 from app.core.config import settings
 from app.schemas.summary import PaperSummaryCard, SummaryStatus
 from app.services.citation import generate_apa_citation, generate_bibtex_citation
-from app.services.entity_extraction import extract_entities
-from app.services.graph_ingestion import index_paper_in_graph
 from app.services.llm_client import LlmError, generate_json
+from app.services.record_extraction import extract_and_index_record, reassemble, split_sections
 from ingestion.pipeline import load_paper_metadata
+from ingestion.text_extractor import find_abstract
 from ingestion.vector_store import get_chunks_for_paper
 
 logger = logging.getLogger(__name__)
 
 _REQUIRED_FIELDS = ["tldr", "problem", "method_explained", "key_results", "limitations"]
 
-_PROMPT_TEMPLATE = """You are summarizing an academic paper for someone who wants a clear, \
+_PROMPT_TEMPLATE = """You are summarizing an academic paper for a student who wants a clear, \
 plain-English understanding without reading the full text. Base every claim strictly on the \
-excerpts below - do not invent numbers, results, or claims that aren't supported by the text.
+text below - do not invent numbers, results, or claims that are not supported by it.
 
 Paper title: {title}
 
-Excerpts from the paper:
+ABSTRACT (written by the authors):
+{abstract}
+
+EXCERPTS FROM THE REST OF THE PAPER:
 ---
-{chunks}
+{excerpts}
 ---
 
 Respond with ONLY a JSON object with exactly these fields, each a plain string:
 {{
-  "tldr": "One or two sentence summary of what this paper does and why it matters.",
-  "problem": "What problem or question this paper addresses.",
-  "method_explained": "How their approach works, explained simply, avoiding unexplained jargon.",
-  "key_results": "The concrete results reported, with real numbers from the text if present.",
-  "limitations": "Limitations or weaknesses the paper itself acknowledges, or reasonable ones if none are stated."
+  "tldr": "3 to 4 sentences: the problem, what the authors did or propose, and the main finding or contribution. Be specific (name the method, data or categories), not generic.",
+  "problem": "The problem or question the paper addresses and why it matters (2 to 3 sentences).",
+  "method_explained": "How the approach works or how the survey is organised, explained simply (3 to 5 sentences).",
+  "key_results": "The concrete results with real numbers if the text has them. For a survey with no experiments, give its main findings, taxonomy or conclusions instead.",
+  "limitations": "Limitations, open challenges or future directions the paper itself states."
 }}"""
+
+# How much of each part of the paper is shown to the AI (characters).
+_ABSTRACT_MAX = 2500
+_INTRO_TAIL = 1800        # end of the introduction usually lists the contributions
+_EXPERIMENTS_HEAD = 1500
+_CONCLUSION_HEAD = 1500
 
 
 def _summary_cache_path(paper_id: str) -> Path:
@@ -63,9 +72,40 @@ def _write_cached_summary(paper_id: str, card: PaperSummaryCard) -> None:
     path.write_text(card.model_dump_json(), encoding="utf-8")
 
 
-def build_prompt(title: str, chunks: list[str]) -> str:
-    joined_chunks = "\n\n".join(chunks)
-    return _PROMPT_TEMPLATE.format(title=title, chunks=joined_chunks)
+def get_abstract(paper, text: str) -> str:
+    """The abstract printed in the PDF if we can find it, else the one from the search source."""
+    from_pdf = find_abstract(text)
+    if from_pdf:
+        return from_pdf
+    return (paper.abstract or "").strip()[:_ABSTRACT_MAX]
+
+
+def pick_excerpts(text: str, abstract: str) -> list[str]:
+    """
+    Chooses the parts of the whole paper that matter most for a summary:
+    the end of the introduction (contributions), the start of the
+    experiments (results) and the conclusion (findings and limitations).
+    """
+    sections = split_sections(text)
+    intro = sections.get("intro", "")
+    if abstract and abstract[:80] in intro:
+        intro = intro.split(abstract[:80], 1)[1][len(abstract) - 80:]   # drop the abstract itself
+    excerpts = []
+    if intro.strip():
+        excerpts.append("[Introduction / contributions]\n" + intro.strip()[-_INTRO_TAIL:])
+    if sections.get("experiments"):
+        excerpts.append("[Experiments / results]\n" + sections["experiments"][:_EXPERIMENTS_HEAD])
+    if sections.get("conclusion"):
+        excerpts.append("[Conclusion]\n" + sections["conclusion"][:_CONCLUSION_HEAD])
+    return excerpts
+
+
+def build_prompt(title: str, abstract: str, excerpts: list[str]) -> str:
+    return _PROMPT_TEMPLATE.format(
+        title=title,
+        abstract=abstract or "(no abstract available)",
+        excerpts="\n\n".join(excerpts) or "(no further text available)",
+    )
 
 
 async def summarize_paper(paper_id: str, force: bool = False, user_id: str | None = None) -> dict:
@@ -78,15 +118,12 @@ async def summarize_paper(paper_id: str, force: bool = False, user_id: str | Non
         cached = _read_cached_summary(paper_id)
         if cached is not None:
             logger.info("Summary for %s already cached, skipping LLM call", paper_id)
-            # Still attempt graph indexing (best-effort) - a summary cached
-            # from before Phase 5 existed would otherwise never get its
-            # entities extracted and written to the graph.
+            # Still index the paper in the graph (best-effort). The extracted
+            # record is cached on disk, so this costs no extra LLM calls.
             try:
                 paper = load_paper_metadata(paper_id)
                 if paper is not None:
-                    entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
-                    entities = await extract_entities(paper.title, entity_chunks)
-                    await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"], user_id)
+                    await extract_and_index_record(paper_id, paper, user_id)
             except Exception:
                 logger.exception("Graph indexing failed for cached summary paper_id=%s", paper_id)
 
@@ -106,7 +143,7 @@ async def summarize_paper(paper_id: str, force: bool = False, user_id: str | Non
             "message": "No metadata found for this paper_id. Ingest it first via /api/ingest.",
         }
 
-    chunks = get_chunks_for_paper(paper_id, limit=settings.summary_chunks_used)
+    chunks = get_chunks_for_paper(paper_id)   # every chunk: the whole paper is used
     if not chunks:
         return {
             "paper_id": paper_id,
@@ -115,7 +152,9 @@ async def summarize_paper(paper_id: str, force: bool = False, user_id: str | Non
             "message": "This paper has no stored chunks to summarize (was it ingested successfully?).",
         }
 
-    prompt = build_prompt(paper.title, chunks)
+    text = reassemble(chunks)
+    abstract = get_abstract(paper, text)
+    prompt = build_prompt(paper.title, abstract, pick_excerpts(text, abstract))
 
     try:
         raw = await generate_json(prompt)
@@ -143,19 +182,17 @@ async def summarize_paper(paper_id: str, force: bool = False, user_id: str | Non
         method_explained=raw["method_explained"],
         key_results=raw["key_results"],
         limitations=raw["limitations"],
+        abstract=abstract,
         citation_apa=generate_apa_citation(paper),
         citation_bibtex=generate_bibtex_citation(paper),
     )
 
     _write_cached_summary(paper_id, card)
 
-    # Best-effort graph indexing: a failure here should never break the
-    # summary response itself, since the summary is the primary deliverable
-    # and the graph is an enrichment on top of it (Phase 5).
+    # Best-effort graph indexing: a failure here must never break the summary
+    # itself. The whole paper is read section by section (Phase 2).
     try:
-        entity_chunks = get_chunks_for_paper(paper_id, limit=settings.entity_extraction_chunks_used)
-        entities = await extract_entities(paper.title, entity_chunks)
-        await index_paper_in_graph(paper_id, paper, entities["methods"], entities["datasets"], user_id)
+        await extract_and_index_record(paper_id, paper, user_id)
     except Exception:
         logger.exception("Graph indexing failed for paper_id=%s (summary still succeeded)", paper_id)
 

@@ -141,8 +141,36 @@ async def test_summarize_paper_uses_cache_on_second_call(monkeypatch, tmp_path):
     assert second["status"] == SummaryStatus.ALREADY_CACHED
 
 
-def test_build_prompt_includes_title_and_chunks():
-    prompt = summarizer.build_prompt("My Paper Title", ["chunk one text", "chunk two text"])
+def test_build_prompt_includes_title_abstract_and_excerpts():
+    prompt = summarizer.build_prompt("My Paper Title", "The full abstract text.", ["excerpt one", "excerpt two"])
     assert "My Paper Title" in prompt
-    assert "chunk one text" in prompt
-    assert "chunk two text" in prompt
+    assert "The full abstract text." in prompt
+    assert "excerpt one" in prompt
+    assert "excerpt two" in prompt
+
+
+def test_get_abstract_prefers_pdf_text_over_search_source():
+    pdf_text = "Title\nAbstract— " + "We study graphs in depth. " * 20 + "\nIndex Terms— graphs\nI. INTRODUCTION\nBody"
+    abstract = summarizer.get_abstract(_paper(abstract="short metadata abstract"), pdf_text)
+    assert abstract.startswith("We study graphs")
+    assert "Index Terms" not in abstract
+
+
+def test_get_abstract_falls_back_to_search_source():
+    abstract = summarizer.get_abstract(_paper(abstract="metadata abstract"), "no abstract heading in this text")
+    assert abstract == "metadata abstract"
+
+
+def test_pick_excerpts_uses_intro_experiments_and_conclusion():
+    text = (
+        "Title\n1 Introduction\nWe propose a new model. Our contributions are listed here.\n"
+        "2 Method\nThe model works like this.\n"
+        "3 Experiments\nOur model reaches 91.2% accuracy on Cora.\n"
+        "4 Conclusion\nWe showed it works. Future work is needed.\n"
+        "References\n[1] Someone"
+    )
+    joined = "\n".join(summarizer.pick_excerpts(text, ""))
+    assert "contributions" in joined
+    assert "91.2%" in joined
+    assert "Future work" in joined
+    assert "Someone" not in joined

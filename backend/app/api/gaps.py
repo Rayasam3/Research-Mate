@@ -1,4 +1,7 @@
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+
+from app.api.auth import get_current_user
+from app.db.models import User
 
 from app.core.config import settings
 from app.core.limiter import limiter
@@ -18,14 +21,14 @@ router = APIRouter()
 async def get_gaps(
     request: Request,
     paper_ids: str = Query(..., description="Comma-separated paper_ids to analyze"),
+    user: User = Depends(get_current_user),
 ) -> GapAnalysisResponse:
     """
-    Finds methods/datasets used in only one of the given papers (a real,
-    grounded signal of under-exploration), and asks the LLM to phrase
-    these as plain-English gap statements.
+    Research-gap CANDIDATES with evidence: (1) method x dataset pairs that no
+    paper has tried, (2) limitations and future work the authors wrote.
     """
     ids = [pid.strip() for pid in paper_ids.split(",") if pid.strip()]
-    result = await analyze_gaps(ids)
+    result = await analyze_gaps(ids, user.id)
     return GapAnalysisResponse(**result)
 
 

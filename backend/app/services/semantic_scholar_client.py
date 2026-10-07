@@ -10,11 +10,12 @@ import httpx
 
 from app.core.config import settings
 from app.schemas.paper import Paper, PaperSource
+from app.services.domain import canonical_field
 
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.semanticscholar.org/graph/v1/paper/search"
-FIELDS = "title,authors,abstract,year,externalIds,openAccessPdf,url"
+FIELDS = "title,authors,abstract,year,externalIds,openAccessPdf,url,citationCount,fieldsOfStudy"
 
 
 async def search_semantic_scholar(topic: str, max_results: int) -> list[Paper]:
@@ -50,6 +51,8 @@ async def search_semantic_scholar(topic: str, max_results: int) -> list[Paper]:
                     pdf_url=open_access.get("url"),
                     doi=external_ids.get("DOI"),
                     url=item.get("url"),
+                    field=canonical_field((item.get("fieldsOfStudy") or [None])[0]),
+                    citation_count=item.get("citationCount"),
                 )
             )
         except Exception:

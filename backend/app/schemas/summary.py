@@ -24,6 +24,7 @@ class PaperSummaryCard(BaseModel):
     method_explained: str
     key_results: str
     limitations: str
+    abstract: str = ""       # the authors' own abstract, shown in full
     citation_apa: str
     citation_bibtex: str
 

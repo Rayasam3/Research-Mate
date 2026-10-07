@@ -3,11 +3,26 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import { useTheme } from "../hooks/useTheme";
 
+function Logo() {
+  return (
+    <svg viewBox="0 0 64 64" className="h-8 w-8" aria-hidden="true">
+      <rect width="64" height="64" rx="14" fill="#4f46e5" />
+      <g stroke="#fff" strokeWidth="3" strokeLinecap="round">
+        <line x1="20" y1="22" x2="44" y2="20" />
+        <line x1="20" y1="22" x2="30" y2="44" />
+        <line x1="44" y1="20" x2="30" y2="44" />
+      </g>
+      <circle cx="20" cy="22" r="6" fill="#fff" />
+      <circle cx="44" cy="20" r="6" fill="#fbbf24" />
+      <circle cx="30" cy="44" r="6" fill="#34d399" />
+    </svg>
+  );
+}
+
 export default function Header() {
   const { theme, toggleTheme } = useTheme();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const isDark = theme === "dark";
 
   function handleLogout() {
     logout();
@@ -15,34 +30,24 @@ export default function Header() {
   }
 
   return (
-    <header className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-4">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="text-2xl">📄</span>
-          <span className="text-lg font-bold text-slate-900 dark:text-white">Research Mate</span>
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/80 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <Link to="/" className="flex items-center gap-2.5">
+          <Logo />
+          <span className="font-display text-xl font-semibold text-slate-900 dark:text-white">
+            Research Mate
+          </span>
         </Link>
-        <div className="flex items-center gap-4">
+
+        <div className="flex items-center gap-3">
           {user && (
-            <span className="hidden text-sm text-slate-400 sm:inline dark:text-slate-500">
-              {user.email}
-            </span>
+            <span className="hidden text-sm text-slate-400 sm:inline dark:text-slate-500">{user.email}</span>
           )}
-          <button
-            onClick={toggleTheme}
-            aria-label="Toggle dark mode"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-          >
-            {isDark ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1Z" /></svg>
-            ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5"><path d="M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Zm0-16a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V4a1 1 0 0 1 1-1ZM4 11a1 1 0 0 1 1 1 1 1 0 0 1-1 1H3a1 1 0 1 1 0-2h1Zm17 0a1 1 0 0 1 1 1 1 1 0 0 1-1 1h-1a1 1 0 1 1 0-2h1ZM5.64 5.64a1 1 0 0 1 1.41 0l.71.7a1 1 0 1 1-1.42 1.42l-.7-.71a1 1 0 0 1 0-1.41Zm12.02 12.02a1 1 0 0 1 1.41 0l.71.7a1 1 0 1 1-1.42 1.42l-.7-.71a1 1 0 0 1 0-1.41ZM18.36 5.64a1 1 0 0 1 0 1.41l-.71.7a1 1 0 1 1-1.41-1.41l.7-.7a1 1 0 0 1 1.42 0ZM6.36 17.66a1 1 0 0 1 0 1.41l-.7.71a1 1 0 0 1-1.42-1.42l.71-.7a1 1 0 0 1 1.41 0Z" /></svg>
-            )}
+          <button onClick={toggleTheme} aria-label="Toggle dark mode" className="btn-ghost h-9 w-9 !p-0">
+            {theme === "dark" ? "☾" : "☀"}
           </button>
           {user && (
-            <button
-              onClick={handleLogout}
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-            >
+            <button onClick={handleLogout} className="btn-ghost">
               Log out
             </button>
           )}

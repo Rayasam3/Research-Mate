@@ -96,6 +96,13 @@ async def _generate_json_groq(prompt: str, retry_on_rate_limit: bool = True) -> 
                 return await _generate_json_groq(prompt, retry_on_rate_limit=False)
             logger.error("Groq request failed with status %s: %s", exc.response.status_code, exc.response.text)
             raise LlmError(f"Groq request failed ({exc.response.status_code}): {exc.response.text[:300]}") from exc
+        except httpx.TimeoutException as exc:
+            # A slow answer from Groq: wait a moment and try once more.
+            if retry_on_rate_limit:
+                logger.warning("Groq timed out, retrying once")
+                await asyncio.sleep(3)
+                return await _generate_json_groq(prompt, retry_on_rate_limit=False)
+            raise LlmError("Groq timed out twice.") from exc
         except Exception as exc:
             logger.exception("Groq request failed")
             raise LlmError(f"Groq request failed: {exc}") from exc

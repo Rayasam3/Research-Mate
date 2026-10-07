@@ -7,20 +7,24 @@ comparison table, a knowledge-graph-backed gap analysis, and an
 auto-drafted Related Work paragraph with citations - all unattended,
 via a LangGraph agent.
 
+## What it does
+
+1. **Search** four sources (ArXiv, Semantic Scholar, PubMed, OpenAlex).
+2. **Detect the field** of the topic (e.g. Computer Science vs Medicine) by voting on the sources' field labels, and **rank papers by relevance** (embedding similarity to the topic, the user's own field, citations, recency). Off-topic papers are dropped.
+3. **Read the full paper**, section by section (introduction, method, experiments, conclusion), and extract methods, datasets, results, limitations and future work with an LLM.
+4. **Build a knowledge graph** in Neo4j: `Paper`, `Method`, `Dataset`, `Domain`, `Task`, `Limitation`, `FutureWork`, `Author` and `Gap` nodes.
+5. **Show research-gap candidates with evidence**: method x dataset pairs nobody has tried, plus the limitations and future work the authors wrote themselves. A rare method is never called a gap on its own.
+6. Compare papers by what is *different* in each, draft a Related Work paragraph, and explore the same graph in the Neo4j console (`docs/neo4j_demo_queries.cypher`).
+
 ## Project Status
 
-- [x] Phase 0 - Project & Environment Setup
-- [x] Phase 1 - Paper Search Layer (ArXiv / Semantic Scholar / PubMed / OpenAlex)
-- [x] Phase 2 - Document Ingestion & Full-Text Reading
-- [x] Phase 3 - Per-Paper Summary Cards (LLM, dual-provider Ollama/Groq)
-- [x] Phase 4 - LangGraph Agent Loop
-- [x] Phase 5 - Knowledge Graph & Comparison Layer (Neo4j)
-- [x] Phase 6 - Gap Analysis & Draft Writing
-- [x] Phase 7 - React Frontend (search, results, comparison, explore deeper, dark mode)
-- [x] Phase 8 - MLOps Hygiene (Redis caching, metrics, incident notes)
-- [ ] Phase 9 - Public Deployment
-
-See `Research_Mate_Project_Plan.md` for the full phase-by-phase breakdown.
+- [x] Search layer, ingestion, summary cards, LangGraph agent, Redis cache, auth (PostgreSQL + JWT)
+- [x] Knowledge graph model (paper record schema, normalized keys, constraints)
+- [x] Full-paper, section-aware extraction
+- [x] Domain detection and relevance ranking
+- [x] Evidence-based gap candidates
+- [x] New frontend (progress steps, knowledge graph view, gaps with evidence)
+- [ ] Public deployment
 
 ## Architecture
 
@@ -49,7 +53,7 @@ See `Research_Mate_Project_Plan.md` for the full phase-by-phase breakdown.
 
 
 
-The agent (LangGraph) orchestrates: **search -> filter -> ingest -> summarize**,
+The agent (LangGraph) orchestrates: **search -> domain -> filter -> ingest -> summarize**,
 running each paper through the full pipeline unattended, in the background.
 
 ## Prerequisites

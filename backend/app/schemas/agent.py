@@ -8,6 +8,7 @@ class AgentRunRequest(BaseModel):
     max_papers: int = Field(default=5, ge=1, le=20)
     year_from: int | None = None
     year_to: int | None = None
+    field: str | None = None  # the user's own research field; None = auto-detect
 
 
 class AgentRunResponse(BaseModel):
@@ -20,3 +21,4 @@ class AgentStatusResponse(BaseModel):
     status: JobStatus
     result: dict | None = None
     error: str | None = None
+    steps_done: list[str] = []

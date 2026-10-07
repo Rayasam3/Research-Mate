@@ -45,3 +45,14 @@ def corrupt_pdf_path(tmp_path):
     path = tmp_path / "corrupt.pdf"
     path.write_bytes(b"this is not a real pdf file")
     return path
+
+
+@pytest.fixture(autouse=True)
+def _skip_graph_extraction_in_tests(monkeypatch):
+    """Tests never call the LLM or Neo4j for graph extraction."""
+    from app.services import summarizer
+
+    async def _noop(paper_id, paper, user_id):
+        return {}
+
+    monkeypatch.setattr(summarizer, "extract_and_index_record", _noop)

@@ -1,11 +1,49 @@
 from pydantic import BaseModel, Field
 
 
+class Evidence(BaseModel):
+    title: str
+    year: int | None = None
+
+
+class AuthorHint(BaseModel):
+    kind: str          # "future_work" or "limitation"
+    text: str
+    paper_title: str
+
+
+class UntestedCombination(BaseModel):
+    method: str
+    dataset: str
+    statement: str
+    strength: str      # "strong" | "moderate" | "weak"
+    score: float
+    method_evidence: list[Evidence]
+    dataset_evidence: list[Evidence]
+    author_hint: AuthorHint | None = None
+    caveats: list[str]
+
+
+class StatedItem(BaseModel):
+    text: str
+    paper_id: str
+    paper_title: str
+    year: int | None = None
+    citations: int | None = None
+
+
+class GapSummary(BaseModel):
+    papers: int
+    core_methods: int
+    datasets: int
+    pairs_not_tested: int
+
+
 class GapAnalysisResponse(BaseModel):
-    isolated_methods: list[str]
-    isolated_datasets: list[str]
-    method_gaps: list[str]
-    dataset_gaps: list[str]
+    untested_combinations: list[UntestedCombination]
+    future_work: list[StatedItem]
+    limitations: list[StatedItem]
+    summary: GapSummary
 
 
 class DraftRelatedWorkRequest(BaseModel):

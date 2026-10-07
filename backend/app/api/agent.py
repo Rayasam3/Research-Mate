@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.limiter import limiter
 from app.db.models import User
 from app.schemas.agent import AgentRunRequest, AgentRunResponse, AgentStatusResponse
-from app.services.job_store import create_job, get_job, set_done, set_failed, set_running
+from app.services.job_store import add_step_done, create_job, get_job, set_done, set_failed, set_running
 
 router = APIRouter()
 
@@ -15,16 +15,20 @@ async def _run_agent_job(job_id: str, payload: AgentRunRequest, user_id: str) ->
     set_running(job_id)
     try:
         graph = get_agent_graph()
-        final_state = await graph.ainvoke(
-            {
-                "topic": payload.topic,
-                "max_papers": payload.max_papers,
-                "year_from": payload.year_from,
-                "year_to": payload.year_to,
-                "user_id": user_id,
-                "errors": [],
-            }
-        )
+        final_state = {
+            "topic": payload.topic,
+            "max_papers": payload.max_papers,
+            "year_from": payload.year_from,
+            "year_to": payload.year_to,
+            "user_id": user_id,
+            "user_field": payload.field,
+            "errors": [],
+        }
+        # Run the agent one step at a time so the frontend can show progress.
+        async for update in graph.astream(dict(final_state), stream_mode="updates"):
+            for step_name, changes in update.items():
+                final_state.update(changes)
+                add_step_done(job_id, step_name)
         set_done(job_id, final_state)
     except Exception as exc:
         set_failed(job_id, str(exc))
@@ -59,4 +63,5 @@ async def agent_status(job_id: str, user: User = Depends(get_current_user)) -> A
         status=job["status"],
         result=job["result"],
         error=job["error"],
+        steps_done=job["steps_done"],
     )

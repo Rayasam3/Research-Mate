@@ -10,7 +10,7 @@ import SearchPage from "./pages/SearchPage";
 export default function App() {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-slate-50 transition-colors dark:bg-slate-950">
+      <div className="min-h-screen">
         <Header />
         <Routes>
           <Route path="/login" element={<LoginPage />} />

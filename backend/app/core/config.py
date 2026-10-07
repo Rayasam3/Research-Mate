@@ -58,15 +58,21 @@ class Settings(BaseSettings):
     ollama_timeout_seconds: int = 600
     groq_api_key: str = ""
     groq_model: str = "openai/gpt-oss-20b"
-    groq_timeout_seconds: int = 60
-    summary_chunks_used: int = 3  # how many stored chunks to feed the LLM per paper
+    groq_timeout_seconds: int = 90
 
     # Phase 5: knowledge graph
     neo4j_uri: str = "bolt://localhost:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "change-me"
     neo4j_database: str = "neo4j"
-    entity_extraction_chunks_used: int = 1
+
+    # Phase 2: full-paper extraction (how much of the paper the LLM reads)
+    record_window_chars: int = 4000       # size of one text window sent to the LLM
+    record_max_calls_per_pass: int = 2    # windows per pass (methods / experiments / conclusion)
+    record_call_gap_seconds: float = 15.0  # pause between Groq calls (free tier = 8k tokens/min)
+
+    # Phase 3: relevance ranking
+    relevance_min_similarity: float = 0.2  # papers less similar to the topic than this are dropped
 
     @property
     def cors_origins_list(self) -> list[str]:
